@@ -31,6 +31,5 @@ class Star(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(length=150), nullable=False)
     birthdate = Column(Date, nullable=True)
-    #
     #id_movie = Column(Integer, ForeignKey('movies.id'))
     title = relationship('Movie')

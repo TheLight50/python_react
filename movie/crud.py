@@ -6,6 +6,7 @@ manage CRUD and adapt model data from db to schema data to api rest
 from typing import Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy import extract, desc, between
+from sqlalchemy import func
 from datetime import date
 from fastapi.logger import logger
 
@@ -56,9 +57,23 @@ def create_movie(db: Session, movie: schemas.MovieCreate):
     db.refresh(db_movie)
     return db_movie
 
+def update_movie(db: Session, movie: schemas.Movie):
+    db_movie = db.query(models.Movie).filter(models.Movie.id == movie.id).first()
+    if db_movie is not None:
+        # update data from db
+        db_movie.title = movie.title
+        db_movie.year = movie.year
+        db_movie.duration = movie.duration
+        # validate update in db
+        db.commit()
+    # return updated object or None if not found
+    return db_movie
+
 def update_movie_director(db: Session, movie_id: int, director: int):
     db_movie = db.query(models.Movie).filter(models.Movie.id == movie_id).first()
     db_star = get_star(db=db, star_id = director)
+    if (db_star is None):
+        db_movie = None
     if db_movie is not None and db_star is not None:
         # update data from db
         db_movie.director = db_star
@@ -71,11 +86,12 @@ def update_movie_director(db: Session, movie_id: int, director: int):
 def add_movie_actor(db: Session, mid: int, sid: int):
     db_movie = db.query(models.Movie).filter(models.Movie.id == mid).first()
     db_star = get_star(db=db, star_id = sid)
+    if (db_star is None):
+        db_movie = None
     if db_movie is not None and db_star is not None:
         if (db_star not in db_movie.actors):
             db_movie.actors.append(db_star)
             db.commit()
-    db.refresh(db_movie)
     return db_movie
 
 def update_movie_actors(db: Session, mid: int, sids: List[int]):
@@ -112,6 +128,11 @@ def get_movies_count(db: Session):
 def get_movies_count_year(db: Session, year: int):
     return _get_movies_by_predicate(models.Movie.year == year).count()
 
+def get_movies_count_by_year(db: Session):
+    return db.query(models.Movie.year, func.count()).group_by(models.Movie.year).order_by(models.Movie.year).all()
+
+def get_movies_duration_info_by_year(db: Session):
+    return db.query(models.Movie.year, func.min(models.Movie.duration), func.avg(models.Movie.duration), func.max(models.Movie.duration)).group_by(models.Movie.year).order_by(models.Movie.year).all()
 
 # CRUD for Star objects
 def _get_stars_by_predicate(*predicate, db: Session):
@@ -178,3 +199,9 @@ def get_stars_director_by_title(db: Session, title: str):
 
 def get_stars_count(db: Session):
     return db.query(models.Star).count()
+
+def get_stats_movies_by_director(db: Session, min_count: int=10):
+    return db.query(models.Star, func.count(models.Movie.id).label("movie_count")).join(models.Movie.director).group_by(models.Star).having(func.count(models.Movie.id) >= min_count).order_by(desc("movie_count")).all()
+
+def get_stats_movies_by_actor(db: Session, min_count: int=15):
+    return db.query(models.Star, func.count(models.Movie.id).label("movie_count"), func.min(models.Movie.year).label("year_first_film"), func.max(models.Movie.year).label("year_last_film")).join(models.Movie.actors).group_by(models.Star).having(func.count(models.Movie.id) >= min_count).order_by(desc("movie_count")).all()

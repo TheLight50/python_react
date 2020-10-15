@@ -23,6 +23,7 @@ class Movie(MovieBase):
     class Config:
         orm_mode = True
 
+# same for star table
 class StarBase(BaseModel):
     name: str
     birthdate: Optional[date] = None
@@ -36,6 +37,7 @@ class Star(StarBase):
     class Config:
         orm_mode = True
 
+# movie with additional information from other table
 class MovieDetail(Movie):
     director : Optional[Star] = None
     actors : List[Star] = []
